@@ -1,0 +1,64 @@
+name: inventory-platform
+
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Express
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env}
+    volumes:
+      - mssql-data:/var/opt/mssql
+    networks:
+      - inventory-network
+    healthcheck:
+      test: >-
+        /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa
+        -P "$$MSSQL_SA_PASSWORD" -C -Q "SELECT 1" -b -o /dev/null
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  inventory-api:
+    build:
+      context: ../inventory-api
+      dockerfile: src/Inventory.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: Server=mssql,1433;Database=InventoryDb;User Id=sa;Password=${MSSQL_SA_PASSWORD};Encrypt=False;TrustServerCertificate=True
+      Jwt__Secret: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      Jwt__Issuer: inventory-api
+      Jwt__Audience: inventory-api-users
+      Jwt__ExpirationMinutes: 60
+      Cors__AllowedOrigins__0: http://localhost
+      AllowedHosts: localhost
+    depends_on:
+      mssql:
+        condition: service_healthy
+    networks:
+      - inventory-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f --silent http://localhost/health/live || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  inventory-dashboard:
+    build:
+      context: ../inventory-dashboard
+    depends_on:
+      inventory-api:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    networks:
+      - inventory-network
+
+volumes:
+  mssql-data:
+
+networks:
+  inventory-network:
+    driver: bridge

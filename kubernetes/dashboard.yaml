@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-dashboard
+  namespace: inventory
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: inventory-dashboard
+  template:
+    metadata:
+      labels:
+        app: inventory-dashboard
+    spec:
+      containers:
+        - name: inventory-dashboard
+          image: ghcr.io/replace-with-github-owner/inventory-dashboard:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 80
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-dashboard
+  namespace: inventory
+spec:
+  selector:
+    app: inventory-dashboard
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

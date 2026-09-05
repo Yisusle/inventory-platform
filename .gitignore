@@ -1,0 +1,4 @@
+.env
+*.env
+!*.env.example
+kubernetes/local.yaml
